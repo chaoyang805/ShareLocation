@@ -5,7 +5,6 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -75,8 +74,6 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         @Override
         public void onMessageReceived(String message) {
             final User user = new User(message);
-            Message msg = mHanler.obtainMessage();
-            msg.obj = user;
             mHanler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -97,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
                     removeUserFromView(closedDeviceId);
                     //从地图中移除掉用户的marker
                     mBaiduMapManager.removeMarker(closedDeviceId);
+                    mTvUserCount.setText(getString(R.string.sharing_user_num_text, mAllUsersView.getChildCount()));
                     ToastUtils.showToast(MainActivity.this, getString(R.string.user_removed, userName));
                 }
             });
@@ -126,6 +124,7 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
             public void onClick(View view) {
                 if (isSharing) {
                     stopShare();
+                    ToastUtils.showToast(MainActivity.this, getString(R.string.cancel_location_share));
                     fab.setImageResource(R.drawable.ic_share_white_48dp);
                     isSharing = false;
                 } else {
@@ -186,7 +185,6 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
      * 停止共享位置的方法
      */
     private void stopShare() {
-        ToastUtils.showToast(this, getString(R.string.cancel_location_share));
         mClient.disconnect();
         mClient.getHandler().setOnMessageReceivedListener(null);
         mClient = null;

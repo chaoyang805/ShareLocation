@@ -99,7 +99,8 @@ public class BaiduMapManager implements BDLocationListener {
         mClient.registerLocationListener(this);
         //配置mClient对象的参数信息
         LocationClientOption option = new LocationClientOption();
-
+        //设置扫描间隔为三秒
+        option.setScanSpan(3000);
         //开启GPS
         option.setOpenGps(true);
         //坐标类型
