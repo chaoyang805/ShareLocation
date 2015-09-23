@@ -1,7 +1,6 @@
 package com.chaoyang805.sharelocation.baidumap;
 
 import android.content.Context;
-import android.telephony.TelephonyManager;
 import android.view.LayoutInflater;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -19,7 +18,6 @@ import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.Marker;
 import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.MyLocationConfiguration;
-import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.model.LatLng;
 import com.chaoyang805.sharelocation.R;
@@ -59,10 +57,6 @@ public class BaiduMapManager implements BDLocationListener {
      */
     private boolean isFirstLocate = true;
     /**
-     * 保存定位信息的对象
-     */
-    private MyLocationData mLocationData;
-    /**
      * 保存有关于我的用户信息
      */
     private User me = null;
@@ -83,15 +77,8 @@ public class BaiduMapManager implements BDLocationListener {
      */
     private Map<String, Marker> mMarkers = new HashMap<>();
 
-    /**
-     * 手机的IMEI码,用于区别不同的客户端
-     */
-    private String IMEI;
-
     public BaiduMapManager(Context context, MapView mapView) {
         mContext = context;
-        TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-        IMEI = tm.getDeviceId();
         mMapView = mapView;
         mMapView.showScaleControl(true);
         mMapView.showZoomControls(false);
@@ -102,7 +89,7 @@ public class BaiduMapManager implements BDLocationListener {
     /**
      * 初始化地图
      */
-    public void init(boolean isBatterySavingMode) {
+    public void init() {
         mBaiduMap.setMyLocationEnabled(true);
         mBaiduMap.setMapStatus(MapStatusUpdateFactory.zoomTo(15f));
         MyLocationConfiguration config = new MyLocationConfiguration
@@ -113,28 +100,17 @@ public class BaiduMapManager implements BDLocationListener {
         //配置mClient对象的参数信息
         LocationClientOption option = new LocationClientOption();
 
-        if (isBatterySavingMode) {
-            //定位模式为低精度
-            option.setLocationMode(LocationClientOption.LocationMode.Battery_Saving);
-            //定位间隔为3秒钟
-            option.setScanSpan(3000);
-        } else {
-            //定位模式为高精度
-            option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy);
-            //定位间隔为5秒钟
-            option.setScanSpan(3000);
-        }
         //开启GPS
-        option.setOpenGps(!isBatterySavingMode);
+        option.setOpenGps(true);
         //坐标类型
-        option.setEnableSimulateGps(!isBatterySavingMode);
+        option.setEnableSimulateGps(true);
         //是否需要地址
         option.setIsNeedAddress(true);
         //是否需要手机的方向
         option.setNeedDeviceDirect(true);
         option.setCoorType("bd09ll");
         mClient.setLocOption(option);
-
+        //从布局文件中解析markerview
         mUserMarkerView = (LinearLayout) LayoutInflater.from(mContext).inflate(R.layout.user_profile, null, false);
         mCivUserInfo = (CircleImageView) mUserMarkerView.findViewById(R.id.user_head);
 
@@ -146,7 +122,6 @@ public class BaiduMapManager implements BDLocationListener {
     public void requestLocation() {
         mClient.start();
         mClient.requestLocation();
-//        ToastUtils.showToast(mContext, R.string.locating);
     }
 
     /**
@@ -188,7 +163,6 @@ public class BaiduMapManager implements BDLocationListener {
     @Override
     public void onReceiveLocation(BDLocation bdLocation) {
         if (bdLocation == null) {
-//            Toast.makeText(mContext, R.string.location_failed, Toast.LENGTH_SHORT).show();
             return;
         }
         //定位成功的情况
@@ -197,7 +171,6 @@ public class BaiduMapManager implements BDLocationListener {
                 bdLocation.getLocType() == 66 ||
                 bdLocation.getLocType() == 68 ||
                 bdLocation.getLocType() == 161) {
-            //
             LatLng latLng = new LatLng(bdLocation.getLatitude(), bdLocation.getLongitude());
             if (isFirstLocate) {
                 MapStatusUpdate msu = MapStatusUpdateFactory.newLatLng(latLng);
@@ -211,13 +184,6 @@ public class BaiduMapManager implements BDLocationListener {
         } else {
             Toast.makeText(mContext, R.string.location_failed, Toast.LENGTH_SHORT).show();
         }
-    }
-
-    /**
-     * 将我的位置显示在地图中心的方法
-     */
-    public void backToMyLocation() {
-        mBaiduMap.setMyLocationData(mLocationData);
     }
 
     /**
@@ -246,9 +212,8 @@ public class BaiduMapManager implements BDLocationListener {
      */
     private void addNewMarker(User user) {
         Marker marker;
-        //调试阶段，随机为用户指定头像
         String userName = user.getUserName();
-
+        //根据username最后一个数字来为用户指定头像
         String imageResName = "image_"+userName.charAt(userName.length() - 1);
         //调试阶段，随机为用户指定头像
         mCivUserInfo.setImageResource(mContext.getResources().getIdentifier(imageResName, "drawable",
@@ -277,6 +242,19 @@ public class BaiduMapManager implements BDLocationListener {
         mMarkers.remove(deviceId).remove();
     }
 
+    /**
+     * 移除地图上显示的所有的marker
+     */
+    public void removeAllMarkers() {
+        for (String key : mMarkers.keySet()) {
+            mMarkers.get(key).remove();
+        }
+        mMarkers.clear();
+    }
+
+    /**
+     * 位置信息更新时的回调接口
+     */
     public interface OnLocationUpdateListener {
         void onLocationUpdate(LatLng latLng);
     }

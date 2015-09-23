@@ -9,29 +9,46 @@
     tools:showIn="@layout/activity_main">
 
     <com.baidu.mapapi.map.MapView
-    android:id="@+id/bmap"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:clickable="true"></com.baidu.mapapi.map.MapView>
-
-    <HorizontalScrollView
-        android:id="@+id/sv_users"
+        android:id="@+id/bmap"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="?android:attr/actionBarSize"
-        android:background="#60000000"
-        android:scrollbars="none">
+        android:layout_height="match_parent"
+        android:clickable="true"></com.baidu.mapapi.map.MapView>
 
-        <LinearLayout
-            android:id="@+id/ll_users"
+    <RelativeLayout
+        android:id="@+id/rl_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <HorizontalScrollView
+            android:id="@+id/sv_users"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:gravity="center_horizontal"
-            android:orientation="horizontal"
-            android:padding="8dp">
+            android:layout_marginTop="?android:attr/actionBarSize"
+            android:background="#60000000"
+            android:scrollbars="none">
 
-        </LinearLayout>
-    </HorizontalScrollView>
+            <LinearLayout
+                android:id="@+id/ll_users"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:gravity="center_horizontal"
+                android:orientation="horizontal"
+                android:padding="8dp">
+
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/tv_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/sv_users"
+            android:background="#60000000"
+            android:gravity="center_horizontal"
+            android:text="@string/sharing_user_num_text"
+            android:textColor="@android:color/secondary_text_dark"
+            android:textSize="15sp"/>
+    </RelativeLayout>
 
 </RelativeLayout>

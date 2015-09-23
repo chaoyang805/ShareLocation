@@ -1,7 +1,5 @@
 package com.chaoyang805.sharelocation.netclient;
 
-import android.util.Log;
-
 import com.chaoyang805.sharelocation.model.User;
 
 import org.apache.mina.core.future.ConnectFuture;
@@ -28,10 +26,12 @@ public class LocationClient {
      */
     private LocationUpdateHandler mHandler;
     /**
-     * 客户端连接成功后取得的回话对象
+     * 客户端连接成功后取得的会话对象
      */
     private IoSession mSession;
-
+    /**
+     * 是否连接到服务器端的标志位
+     */
     private boolean isConnected = false;
     /**
      * 是否已经初始化完成
@@ -52,6 +52,7 @@ public class LocationClient {
     }
 
     public void init() {
+        //如果已经初始化。不再重复进行
         if (initiated) {
             return;
         }
@@ -62,14 +63,12 @@ public class LocationClient {
                 mConnector.setHandler(mHandler);
                 mConnector.getFilterChain().addLast("codec",
                         new ProtocolCodecFilter(new TextLineCodecFactory(Charset.forName("UTF-8"))));
+                mConnector.setConnectTimeoutMillis(10000);
+
                 ConnectFuture future = mConnector.connect(new InetSocketAddress("192.168.0.109", 9988));
                 future.awaitUninterruptibly();
                 mSession = future.getSession();
-//                if (mSession != null) {
-//                    mSession.write("CREATE" + " " + mDeviceId);
-//                }
                 isConnected = mSession.isConnected();
-                Log.d(TAG, "locationClient initiated ");
             }
         }.start();
         initiated = true;
@@ -88,6 +87,7 @@ public class LocationClient {
         if (isConnected) {
             String message = user.toJsonString();
             if (mSession != null && mSession.isConnected()) {
+                //第一次创建时将mDeviceId和userName发送到服务器
                 if (!mSessionCreated) {
                     mSession.write("CREATE" + " " + mDeviceId + " " + user.getUserName());
                     mSessionCreated = true;
