@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity"
+    tools:showIn="@layout/activity_main">
+
+    <com.baidu.mapapi.map.MapView
+    android:id="@+id/bmap"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"></com.baidu.mapapi.map.MapView>
+
+    <HorizontalScrollView
+        android:id="@+id/sv_users"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="?android:attr/actionBarSize"
+        android:background="#60000000"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/ll_users"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+</RelativeLayout>
