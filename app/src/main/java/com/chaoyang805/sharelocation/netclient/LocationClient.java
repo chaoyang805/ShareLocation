@@ -46,6 +46,8 @@ public class LocationClient {
      */
     private boolean mSessionCreated = false;
 
+    private boolean mTimeOut = false;
+
     public LocationClient(String deviceId) {
         mDeviceId = deviceId;
         mHandler = new LocationUpdateHandler();
