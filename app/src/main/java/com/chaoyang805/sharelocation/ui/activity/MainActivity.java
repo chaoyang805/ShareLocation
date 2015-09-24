@@ -251,7 +251,12 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         civUser.setTag(user);
         //将userId的hashCode设置为view的id.
         civUser.setId(Math.abs(user.getUid().hashCode()));
-        mAllUsersView.addView(civUser);
+        //添加当前用户的头像到第一个位置
+        if (mDeviceId == user.getUid()) {
+            mAllUsersView.addView(civUser, 0);
+        } else {
+            mAllUsersView.addView(civUser);
+        }
         civUser.setOnClickListener(this);
         mTvUserCount.setText(getString(R.string.sharing_user_num_text, mAllUsersView.getChildCount()));
     }
@@ -276,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
 
     /**
      * 位置更新时，将我的最新位置发送到服务器
+     *
      * @param latLng
      */
     @Override
@@ -293,8 +299,10 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
             mClient.updateMyLocation(me);
         }
     }
+
     /**
      * 用户头像被点击的监听事件
+     *
      * @param v
      */
     @Override

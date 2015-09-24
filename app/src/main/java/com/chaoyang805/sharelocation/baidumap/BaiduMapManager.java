@@ -250,9 +250,7 @@ public class BaiduMapManager implements BDLocationListener {
      */
     public void removeMarker(String deviceId) {
         //分别从地图和mMarkers中移除marker。
-//        if (mMarkers.containsKey(deviceId)) {
         mMarkers.remove(deviceId).remove();
-//        }
     }
 
     /**
