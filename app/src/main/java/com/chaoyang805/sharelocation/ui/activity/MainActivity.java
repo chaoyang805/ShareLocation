@@ -26,13 +26,17 @@ import com.chaoyang805.sharelocation.utils.ToastUtils;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
-public class MainActivity extends AppCompatActivity implements BaiduMapManager.OnLocationUpdateListener {
+public class MainActivity extends AppCompatActivity implements BaiduMapManager.OnLocationUpdateListener, View.OnClickListener {
 
     private static final String TAG = "MainActivity";
     /**
      * 百度地图控件
      */
     private MapView mMapView;
+    /**
+     * 开启和关闭定位的按钮
+     */
+    private FloatingActionButton mFab;
     /**
      * 百度地图manager对象
      */
@@ -41,7 +45,6 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
      * 显示共享位置用户详细信息的布局
      */
     private RelativeLayout mDetailLayout;
-
     /**
      * 显示所有user的view
      */
@@ -66,6 +69,10 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
      * 位置共享的网络客户端对象
      */
     private LocationClient mClient;
+    /**
+     * 连接服务器超时的回调
+     */
+    private LocationClient.OnTimeOutCallback mTimeOutCallback;
     /**
      * 网络客户端接收到服务器数据时的回调
      */
@@ -94,7 +101,6 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
                     removeUserFromView(closedDeviceId);
                     //从地图中移除掉用户的marker
                     mBaiduMapManager.removeMarker(closedDeviceId);
-                    mTvUserCount.setText(getString(R.string.sharing_user_num_text, mAllUsersView.getChildCount()));
                     ToastUtils.showToast(MainActivity.this, getString(R.string.user_removed, userName));
                 }
             });
@@ -118,15 +124,13 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
+        mFab = (FloatingActionButton) findViewById(R.id.fab);
+        mFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (isSharing) {
-                    stopShare();
                     ToastUtils.showToast(MainActivity.this, getString(R.string.cancel_location_share));
-                    fab.setImageResource(R.drawable.ic_share_white_48dp);
-                    isSharing = false;
+                    stopShare();
                 } else {
                     //先判断是否有网络，再开启位置分享
                     if (!fineNetwork()) {
@@ -134,8 +138,7 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
                         return;
                     }
                     startShare();
-                    fab.setImageResource(R.drawable.ic_cancel_white_48dp);
-                    isSharing = true;
+                    ToastUtils.showToast(MainActivity.this, R.string.start_sharing_location);
                 }
 
             }
@@ -146,15 +149,24 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         mDetailLayout = (RelativeLayout) findViewById(R.id.rl_detail);
         mAllUsersView = (LinearLayout) findViewById(R.id.ll_users);
         mTvUserCount = (TextView) findViewById(R.id.tv_hint);
-        mTvUserCount.setText(getString(R.string.sharing_user_num_text, 0));
+        mTvUserCount.setText(R.string.no_user);
         mDetailLayout.setVisibility(View.GONE);
     }
 
     /**
+     * 初始化baidumapmanager
+     */
+    private void prepareMapManager() {
+        mBaiduMapManager = new BaiduMapManager(this, mMapView);
+        mBaiduMapManager.init();
+    }
+
+    /**
      * 是否有网络连接
+     *
      * @return
      */
-    private boolean fineNetwork(){
+    private boolean fineNetwork() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         if (networkInfo != null) {
@@ -167,15 +179,29 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
      * 开始共享位置的方法
      */
     private void startShare() {
+        mFab.setImageResource(R.drawable.ic_cancel_white_48dp);
         mBaiduMapManager.requestLocation();
         mBaiduMapManager.registerLocationListener(this);
         //实例化Mina客户端
         if (mClient == null) {
-            mClient = new LocationClient(mDeviceId);
+            mTimeOutCallback = new LocationClient.OnTimeOutCallback() {
+                @Override
+                public void onTimeOut() {
+                    mHanler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            //连接服务器失败后，提示用户，并且重置mClient对象
+                            ToastUtils.showToast(MainActivity.this, R.string.unable_to_connect_to_server);
+                            stopShare();
+                        }
+                    });
+                }
+            };
+            mClient = new LocationClient(mDeviceId, mTimeOutCallback);
             mClient.init();
             //添加收到消息时的回调
             mClient.getHandler().setOnMessageReceivedListener(mMessageReceivedListener);
-            ToastUtils.showToast(this, getString(R.string.start_sharing_location));
+            isSharing = true;
         }
         mDetailLayout.setVisibility(View.VISIBLE);
 
@@ -185,12 +211,19 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
      * 停止共享位置的方法
      */
     private void stopShare() {
+
+        mFab.setImageResource(R.drawable.ic_share_white_48dp);
+        mAllUsersView.removeAllViews();
+        mDetailLayout.setVisibility(View.GONE);
+
         mClient.disconnect();
         mClient.getHandler().setOnMessageReceivedListener(null);
         mClient = null;
-        mAllUsersView.removeAllViews();
-        mDetailLayout.setVisibility(View.GONE);
+
         mBaiduMapManager.removeAllMarkers();
+        mBaiduMapManager.stopRequest();
+
+        isSharing = false;
     }
 
     /**
@@ -215,10 +248,11 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         int margin = getResources().getDimensionPixelSize(R.dimen.user_head_margin);
         layoutParams.setMargins(margin, margin, margin, margin);
         civUser.setLayoutParams(layoutParams);
-
+        civUser.setTag(user);
         //将userId的hashCode设置为view的id.
         civUser.setId(Math.abs(user.getUid().hashCode()));
         mAllUsersView.addView(civUser);
+        civUser.setOnClickListener(this);
         mTvUserCount.setText(getString(R.string.sharing_user_num_text, mAllUsersView.getChildCount()));
     }
 
@@ -228,14 +262,49 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
     private void removeUserFromView(String deviceId) {
         //根据deviceId来移除相应的view
         mAllUsersView.removeView(findViewById(Math.abs(deviceId.hashCode())));
+        if (mAllUsersView.getChildCount() == 0) {
+            mTvUserCount.setText(getString(R.string.no_user));
+        } else {
+            mTvUserCount.setText(getString(R.string.sharing_user_num_text, mAllUsersView.getChildCount()));
+        }
     }
 
     /**
-     * 初始化baidumapmanager
+     * 保存本机用户的信息
      */
-    private void prepareMapManager() {
-        mBaiduMapManager = new BaiduMapManager(this, mMapView);
-        mBaiduMapManager.init();
+    private User me = null;
+
+    /**
+     * 位置更新时，将我的最新位置发送到服务器
+     * @param latLng
+     */
+    @Override
+    public void onLocationUpdate(LatLng latLng) {
+        if (me == null) {
+            //初始化本机用户的详细信息
+            me = new User();
+            me.setUid(mDeviceId);
+            //调试时随机为用户指定userName
+            me.setUserName("user" + (int) (Math.random() * 5 + 1));
+        }
+        me.setLatLng(latLng);
+        //将我的最新位置信息发送给服务器
+        if (isSharing) {
+            mClient.updateMyLocation(me);
+        }
+    }
+    /**
+     * 用户头像被点击的监听事件
+     * @param v
+     */
+    @Override
+    public void onClick(View v) {
+        User user = (User) v.getTag();
+        if (user != null) {
+            //移动当前用户到地图中心
+            mBaiduMapManager.locateUser(user);
+            ToastUtils.showToast(this, getString(R.string.current_user, user.getUserName()));
+        }
     }
 
     /*在生命周期的各个方法中管理地图的生命周期*/
@@ -258,23 +327,5 @@ public class MainActivity extends AppCompatActivity implements BaiduMapManager.O
         }
         mBaiduMapManager.onDestroy();
         super.onDestroy();
-    }
-
-    private User me = null;
-
-    @Override
-    public void onLocationUpdate(LatLng latLng) {
-        if (me == null) {
-            //初始化本机用户的详细信息
-            me = new User();
-            me.setUid(mDeviceId);
-            //调试时随机为用户指定userName
-            me.setUserName("user" + (int) (Math.random() * 5 + 1));
-        }
-        me.setLatLng(latLng);
-        //将我的最新位置信息发送给服务器
-        if (isSharing) {
-            mClient.updateMyLocation(me);
-        }
     }
 }

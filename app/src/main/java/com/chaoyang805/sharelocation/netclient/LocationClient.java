@@ -45,14 +45,25 @@ public class LocationClient {
      * 会话是否创建的标志位，用来在第一次的时候给服务端发送客户端的用户信息
      */
     private boolean mSessionCreated = false;
+    /**
+     * 连接服务器超时的回调
+     */
+    private OnTimeOutCallback mCallback;
 
-    private boolean mTimeOut = false;
-
-    public LocationClient(String deviceId) {
+    /**
+     * 构造方法
+     * @param deviceId 设备的id信息
+     * @param callback 超时回调
+     */
+    public LocationClient(String deviceId,OnTimeOutCallback callback) {
         mDeviceId = deviceId;
         mHandler = new LocationUpdateHandler();
+        mCallback = callback;
     }
 
+    /**
+     * 初始化客户端
+     */
     public void init() {
         //如果已经初始化。不再重复进行
         if (initiated) {
@@ -66,14 +77,30 @@ public class LocationClient {
                 mConnector.getFilterChain().addLast("codec",
                         new ProtocolCodecFilter(new TextLineCodecFactory(Charset.forName("UTF-8"))));
                 mConnector.setConnectTimeoutMillis(10000);
-
                 ConnectFuture future = mConnector.connect(new InetSocketAddress("192.168.0.109", 9988));
                 future.awaitUninterruptibly();
-                mSession = future.getSession();
-                isConnected = mSession.isConnected();
+                try {
+                    mSession = future.getSession();
+                    isConnected = mSession.isConnected();
+                } catch (Exception e) {
+                    reset();
+                    if (mCallback != null) {
+                        mCallback.onTimeOut();
+                    }
+                    e.printStackTrace();
+                }
             }
         }.start();
         initiated = true;
+    }
+
+    /**
+     * 重置客户端
+     */
+    public void reset(){
+        mConnector.dispose();
+        mConnector = null;
+        initiated = false;
     }
 
     public LocationUpdateHandler getHandler() {
@@ -103,10 +130,15 @@ public class LocationClient {
      * 关闭客户端连接的方法
      */
     public void disconnect() {
+        mCallback = null;
         if (mSession != null && isConnected) {
             mSession.close(true);
             mConnector.dispose();
         }
+    }
+
+    public interface OnTimeOutCallback{
+        void onTimeOut();
     }
 
 }

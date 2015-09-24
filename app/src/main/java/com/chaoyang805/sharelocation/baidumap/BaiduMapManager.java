@@ -3,7 +3,6 @@ package com.chaoyang805.sharelocation.baidumap;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import com.baidu.location.BDLocation;
 import com.baidu.location.BDLocationListener;
@@ -22,6 +21,7 @@ import com.baidu.mapapi.map.OverlayOptions;
 import com.baidu.mapapi.model.LatLng;
 import com.chaoyang805.sharelocation.R;
 import com.chaoyang805.sharelocation.model.User;
+import com.chaoyang805.sharelocation.utils.ToastUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,9 +57,9 @@ public class BaiduMapManager implements BDLocationListener {
      */
     private boolean isFirstLocate = true;
     /**
-     * 保存有关于我的用户信息
+     * 扫描间隔，默认为3s，多次定位失败后间隔越来越长
      */
-    private User me = null;
+    private int mScanSpanMillis = 3000;
     /**
      * 显示用户位置信息的view
      */
@@ -84,7 +84,6 @@ public class BaiduMapManager implements BDLocationListener {
         mMapView.showZoomControls(false);
         mBaiduMap = mapView.getMap();
     }
-
 
     /**
      * 初始化地图
@@ -122,39 +121,22 @@ public class BaiduMapManager implements BDLocationListener {
      */
     public void requestLocation() {
         mClient.start();
-        mClient.requestLocation();
+//        mClient.requestLocation();
     }
 
     /**
-     * 暂停地图
+     * 停止请求位置
      */
-    public void onPause() {
-        mMapView.onPause();
-    }
-
-    /**
-     * 恢复地图
-     */
-    public void onResume() {
-        mMapView.onResume();
-    }
-
-    /**
-     * 销毁地图
-     */
-    public void onDestroy() {
-        // 退出时销毁定位
-        mClient.unRegisterLocationListener(this);
-        mClient.stop();
-        // 关闭定位图层
-        mBaiduMap.setMyLocationEnabled(false);
-        //销毁BitmapDescriptor
-        for (BitmapDescriptor markerView : mMarkerViews) {
-            markerView.recycle();
+    public void stopRequest() {
+        if (mClient.isStarted()) {
+            mClient.stop();
         }
-        mMapView.onDestroy();
-        mMapView = null;
     }
+
+    /**
+     * 定位失败的次数
+     */
+    private int mFailureCount = 0;
 
     /**
      * 定位返回数据的回调
@@ -182,9 +164,34 @@ public class BaiduMapManager implements BDLocationListener {
             if (mListener != null) {
                 mListener.onLocationUpdate(latLng);
             }
+            //重新定位成功后，恢复默认的扫描间隔
+            if (mFailureCount > 0) {
+                mFailureCount = 0;
+                setScanSpan(3000);
+            }
         } else {
-            Toast.makeText(mContext, R.string.location_failed, Toast.LENGTH_SHORT).show();
+            mFailureCount++;
+            //随着失败次数的增加，逐渐延长扫描间隔
+            if (mFailureCount > 0 && mFailureCount <= 3) {
+                setScanSpan(10000);
+            } else if (mFailureCount > 3 && mFailureCount <= 8) {
+                setScanSpan(20000);
+            } else {
+                setScanSpan(60000);
+            }
+            ToastUtils.showToast(mContext, R.string.location_failed);
         }
+    }
+
+    /**
+     * 设置定位扫描间隔
+     *
+     * @param timeInMillis
+     */
+    private void setScanSpan(int timeInMillis) {
+        LocationClientOption option = mClient.getLocOption();
+        option.setScanSpan(timeInMillis);
+        mClient.setLocOption(option);
     }
 
     /**
@@ -209,13 +216,14 @@ public class BaiduMapManager implements BDLocationListener {
 
     /**
      * 添加新的marker到地图上
+     *
      * @param user marker所对应的用户信息
      */
     private void addNewMarker(User user) {
         Marker marker;
         String userName = user.getUserName();
         //根据username最后一个数字来为用户指定头像
-        String imageResName = "image_"+userName.charAt(userName.length() - 1);
+        String imageResName = "image_" + userName.charAt(userName.length() - 1);
         //调试阶段，随机为用户指定头像
         mCivUserInfo.setImageResource(mContext.getResources().getIdentifier(imageResName, "drawable",
                 mContext.getPackageName()));
@@ -227,6 +235,7 @@ public class BaiduMapManager implements BDLocationListener {
 
     /**
      * 判断用户是否已显示在地图上
+     *
      * @param user
      * @return
      */
@@ -236,11 +245,14 @@ public class BaiduMapManager implements BDLocationListener {
 
     /**
      * 移除掉已经关闭位置分享的用户的marker
+     *
      * @param deviceId
      */
     public void removeMarker(String deviceId) {
-        //分别从滴入和mMarkers中移除marker。
+        //分别从地图和mMarkers中移除marker。
+//        if (mMarkers.containsKey(deviceId)) {
         mMarkers.remove(deviceId).remove();
+//        }
     }
 
     /**
@@ -251,6 +263,16 @@ public class BaiduMapManager implements BDLocationListener {
             mMarkers.get(key).remove();
         }
         mMarkers.clear();
+    }
+
+    /**
+     * 将地图移动到当前用户所在位置
+     *
+     * @param user
+     */
+    public void locateUser(User user) {
+        MapStatusUpdate msu = MapStatusUpdateFactory.newLatLng(user.getLatLng());
+        mBaiduMap.animateMapStatus(msu);
     }
 
     /**
@@ -271,5 +293,34 @@ public class BaiduMapManager implements BDLocationListener {
         mListener = listener;
     }
 
+    /**
+     * 暂停地图
+     */
+    public void onPause() {
+        mMapView.onPause();
+    }
+
+    /**
+     * 恢复地图
+     */
+    public void onResume() {
+        mMapView.onResume();
+    }
+
+    /**
+     * 销毁地图
+     */
+    public void onDestroy() {
+        // 退出时销毁定位
+        mClient.unRegisterLocationListener(this);
+        // 关闭定位图层
+        mBaiduMap.setMyLocationEnabled(false);
+        //销毁BitmapDescriptor
+        for (BitmapDescriptor markerView : mMarkerViews) {
+            markerView.recycle();
+        }
+        mMapView.onDestroy();
+        mMapView = null;
+    }
 
 }
